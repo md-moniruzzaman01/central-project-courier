@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "outDir": "./dist",
+    "rootDir": "./src",
+
+    /* JavaScript Support */
+    "baseUrl": "./src" /* Specify the base directory to resolve non-relative module names. */,
+    "paths": {
+      "@middlewares/*": ["app/middlewares/*"],
+      "@modules/*": ["app/modules/*"],
+      "@config/*": ["config/*"],
+      "@libs/*": ["libs/*"],
+      "@constants/*": ["constants/*"],
+      "@helpers/*": ["helpers/*"],
+      "@types/*": ["interfaces/*"],
+    },
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}

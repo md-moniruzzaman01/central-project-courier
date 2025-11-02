@@ -1,0 +1,278 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/**
+ * --------------------------- ENUMS ---------------------------
+ */
+enum PartnerType {
+  REGULAR
+  MONTHLY
+}
+
+enum CourierStatus {
+  REGISTERED
+  RECEIVED
+  PACKED
+  BOXED
+  IN_SHIPMENT
+  IN_TRANSIT
+  ARRIVED_DESTINATION
+  OUT_FOR_DELIVERY
+  DELIVERED
+  HANDED_TO_THIRD_PARTY
+  RETURN
+  CANCELLED
+  MISSING
+  LOST
+}
+
+enum ThirdPartyCourier {
+  NONE
+  DHL
+  FEDEX
+  UPS
+  OTHER
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOBILE_PAYMENT
+  CARD
+  OTHER
+}
+
+/**
+ * --------------------------- USER ---------------------------
+ */
+model User {
+  id           String  @id @default(cuid())
+  externalId   String? @unique // Auth service user ID (MongoDB or external system)
+  name         String
+  email        String  @unique
+  profileImage String?
+  role         String? // Optional: ADMIN, STAFF, ACCOUNTANT, etc.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  createdCouriers   Courier[]              @relation("CourierCreatedBy")
+  statusChanges     CourierStatusHistory[] @relation("StatusChangedBy")
+  handledShipments  Shipment[]             @relation("ShipmentHandledBy")
+  uploadedDocuments Document[]
+  createdPayments   Payment[]              @relation("PaymentCreatedBy")
+}
+
+/**
+ * --------------------------- PARTNER ---------------------------
+ */
+model Partner {
+  id           String      @id @default(cuid())
+  globalUserId String
+  name         String
+  email        String?     @unique
+  companyName    String
+  phone        String?
+  address      String?
+  type         PartnerType @default(REGULAR)
+  isActive     Boolean     @default(true)
+
+  // Relations
+  couriers  Courier[]
+  documents Document[]
+  payments  Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/**
+ * --------------------------- COURIER ---------------------------
+ */
+model Courier {
+  id           String    @id @default(cuid())
+  trackingCode String    @unique
+  partnerId    String
+  partner      Partner   @relation(fields: [partnerId], references: [id])
+  products     Product[]
+
+  // Cost & Finance
+  estimatedCost Float?
+  finalCost     Float?
+  lebarCost     Float?
+  taxCost       Float?
+  dutyCost      Float?
+  transportCost Float?
+  pickupCost    Float?
+  deliveryCost  Float?
+  otherCost     Float?
+  profit        Float?
+
+  // Payment Information
+  paymentStatus PaymentStatus @default(UNPAID)
+  totalAmount   Float?
+  paidAmount    Float?        @default(0)
+  dueAmount     Float?        @default(0)
+  dueDate       DateTime?
+  paidAt        DateTime?
+  notes         String?
+
+  // Relations
+  payments  Payment[]
+  documents Document[]
+
+  // Third Party Info
+  thirdParty      ThirdPartyCourier @default(NONE)
+  thirdPartyTrack String?
+
+  // Box & Shipment
+  boxId String?
+  box   Box?    @relation(fields: [boxId], references: [id])
+
+  // Audit & Tracking
+  statusHistory CourierStatusHistory[]
+  currentStatus CourierStatus          @default(REGISTERED)
+  createdById   String?
+  createdBy     User?                  @relation("CourierCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/**
+ * --------------------------- PAYMENT ---------------------------
+ */
+model Payment {
+  id              String        @id @default(cuid())
+  referenceCode   String        @unique
+  amount          Float
+  method          PaymentMethod @default(CASH)
+  status          PaymentStatus @default(PAID)
+  transactionNote String?
+
+  partnerId String
+  partner   Partner @relation(fields: [partnerId], references: [id])
+
+  courierId String?
+  courier   Courier? @relation(fields: [courierId], references: [id])
+
+  createdById String?
+  createdBy   User?   @relation("PaymentCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/**
+ * --------------------------- PRODUCT ---------------------------
+ */
+model Product {
+  id            String   @id @default(cuid())
+  courierId     String
+  courier       Courier  @relation(fields: [courierId], references: [id])
+  name          String
+  description   String?
+  declaredValue Float?
+  weight        Float?
+  quantity      Int?     @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/**
+ * --------------------------- BOX ---------------------------
+ */
+model Box {
+  id          String        @id @default(cuid())
+  label       String        @unique
+  couriers    Courier[]
+  shipmentId  String?
+  shipment    Shipment?     @relation(fields: [shipmentId], references: [id])
+  status      CourierStatus @default(BOXED)
+  totalWeight Float?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+/**
+ * --------------------------- SHIPMENT ---------------------------
+ */
+model Shipment {
+  id                 String        @id @default(cuid())
+  shipmentCode       String        @unique
+  boxes              Box[]
+  originCountry      String
+  destinationCountry String
+  departureDate      DateTime?
+  arrivalDate        DateTime?
+  status             CourierStatus @default(IN_SHIPMENT)
+  totalWeight        Float?
+
+  // Aggregate costs
+  totalCourierCost   Float?
+  totalLebarCost     Float?
+  totalTaxCost       Float?
+  totalDutyCost      Float?
+  totalTransportCost Float?
+  totalPickupCost    Float?
+  totalDeliveryCost  Float?
+  totalOtherCost     Float?
+  profit             Float?
+
+  // Audit
+  handledById String?
+  handledBy   User?   @relation("ShipmentHandledBy", fields: [handledById], references: [id])
+
+  documents Document[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+/**
+ * --------------------------- COURIER STATUS HISTORY ---------------------------
+ */
+model CourierStatusHistory {
+  id          String        @id @default(cuid())
+  courierId   String
+  courier     Courier       @relation(fields: [courierId], references: [id])
+  status      CourierStatus @default(REGISTERED)
+  note        String?
+  changedById String?
+  changedBy   User?         @relation("StatusChangedBy", fields: [changedById], references: [id])
+  changedAt   DateTime      @default(now())
+}
+
+/**
+ * --------------------------- DOCUMENT ---------------------------
+ */
+model Document {
+  id           String  @id @default(cuid())
+  type         String
+  fileUrl      String
+  uploadedById String?
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id])
+
+  // Optional relations
+  partnerId  String?
+  partner    Partner?  @relation(fields: [partnerId], references: [id])
+  courierId  String?
+  courier    Courier?  @relation(fields: [courierId], references: [id])
+  shipmentId String?
+  shipment   Shipment? @relation(fields: [shipmentId], references: [id])
+
+  createdAt DateTime @default(now())
+}
