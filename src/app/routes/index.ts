@@ -1,20 +1,24 @@
-
-import { AuthRoutes } from "@modules/auth/auth.routes";
-import { ShipmentRoutes } from "@modules/shipment/shipment.routes";
-import express from "express";
+import { courierRoutes } from '@modules/couriur/courier.routes';
+import { receiverRoutes } from '@modules/receiver/receiver.routes';
+import { senderRoutes } from '@modules/sender/sender.routes';
+import express from 'express';
 const router = express.Router();
 
 const moduleRoutes = [
   // ... routes
   {
-    path: "/auth",
-    route: AuthRoutes,
+    path: '/couriers',
+    route: courierRoutes,
   },
   {
-    path: "/shipment",
-    route: ShipmentRoutes,
-  }
+    path: '/receivers',
+    route: receiverRoutes,
+  },
+  {
+    path: '/senders',
+    route: senderRoutes,
+  },
 ];
 
-moduleRoutes.forEach(route => router.use(route.path, route.route));
+moduleRoutes.forEach((route) => router.use(route.path, route.route));
 export default router;

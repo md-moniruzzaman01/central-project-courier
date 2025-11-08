@@ -1,49 +1,76 @@
-import { Request, Response } from 'express';
+import { Request, Response } from "express";
+// internal
+import catchAsync from "@libs/catchAsync";
+import sendResponse from "@libs/sendResponse";
+import pick from "@libs/pick";
 
-interface Shipment {
-  id: string;
-  description: string;
-  status: string;
-}
 
-const shipments: Shipment[] = [];
+const insertIntoDB = catchAsync(async (req: Request, res: Response) => {
+  const { shipmentCosts, shipmentCharges, ...shipmentData } = req.body;
 
-export const createShipment = (req: Request, res: Response) => {
-  const { description, status } = req.body;
-  const newShipment: Shipment = {
-    id: Math.random().toString(36).substr(2, 9),
-    description,
-    status,
-  };
-  shipments.push(newShipment);
-  res.status(201).json({ success: true, shipment: newShipment });
-};
+  // Call service to insert into DB
+  const result = await ShipmentListService.insertIntoDB(finalShipmentData);
 
-export const getShipments = (req: Request, res: Response) => {
-  res.json({ success: true, shipments });
-};
+  // Send response
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Shipment created successfully",
+    data: result,
+  });
+});
 
-export const getShipmentById = (req: Request, res: Response) => {
+const getAllFromDB = catchAsync(async (req: Request, res: Response) => {
+  const filters = pick(req.query, shipmentListFilterableFields);
+  const options = pick(req.query, paginationFields);
+  const result = await ShipmentListService.getAllFromDB(filters, options);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "shipment fetched successfully",
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
+const getByIdFromDB = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const shipment = shipments.find(s => s.id === id);
-  if (!shipment) return res.status(404).json({ success: false, message: 'Shipment not found' });
-  res.json({ success: true, shipment });
-};
+  const parseId = parseInt(id);
+  const result = await ShipmentListService.getByIdFromDB(parseId);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "shipment fetched successfully",
+    data: result,
+  });
+});
 
-export const updateShipment = (req: Request, res: Response) => {
+const updateOneInDB = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { description, status } = req.body;
-  const shipment = shipments.find(s => s.id === id);
-  if (!shipment) return res.status(404).json({ success: false, message: 'Shipment not found' });
-  if (description !== undefined) shipment.description = description;
-  if (status !== undefined) shipment.status = status;
-  res.json({ success: true, shipment });
-};
+  const result = await ShipmentListService.updateOneInDB(id, req.body);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "shipment update successfully",
+    data: result,
+  });
+});
 
-export const deleteShipment = (req: Request, res: Response) => {
+const deleteFromDB = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const idx = shipments.findIndex(s => s.id === id);
-  if (idx === -1) return res.status(404).json({ success: false, message: 'Shipment not found' });
-  const removed = shipments.splice(idx, 1);
-  res.json({ success: true, shipment: removed[0] });
+  const result = await ShipmentListService.deleteByIdFromDB(id);
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "shipment deleted successfully",
+    data: result,
+  });
+});
+
+export const ShipmentController = {
+  insertIntoDB,
+  getAllFromDB,
+  getByIdFromDB,
+  updateOneInDB,
+  deleteFromDB,
 };
